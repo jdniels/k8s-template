@@ -1,63 +1,55 @@
+# apm.configmap.yml
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
+  namespace: elastic
   name: apm-server-config
   labels:
-    k8s-app: apm-server
+    app: apm-server
 data:
   apm-server.yml: |-
     apm-server:
       host: "0.0.0.0:8200"
-      frontend:
-        enabled: false
-    setup.template.settings:
-      index:
-        number_of_shards: 1
-        codec: best_compression
-    setup.dashboards.enabled: true
-    setup.kibana:
-      host: "108.137.55.111:5601"
+
     output.elasticsearch:
-      hosts: ["108.137.55.111:9200"]
-      indices:
-        - index: "apm-%{[beat.version]}-sourcemap"
-          when.contains:
-            processor.event: "sourcemap"
-- index: "apm-%{[beat.version]}-error-%{+yyyy.MM.dd}"
-          when.contains:
-            processor.event: "error"
-- index: "apm-%{[beat.version]}-transaction-%{+yyyy.MM.dd}"
-          when.contains:
-            processor.event: "transaction"
-- index: "apm-%{[beat.version]}-span-%{+yyyy.MM.dd}"
-          when.contains:
-            processor.event: "span"
+      hosts: ['${ELASTICSEARCH_HOST:elasticsearch}:${ELASTICSEARCH_PORT:9200}']
+      username: ${ELASTICSEARCH_USERNAME}
+      password: ${ELASTICSEARCH_PASSWORD}
+
+    setup.kibana:
+      host: '${KIBANA_HOST:kibana}:${KIBANA_PORT:5601}'    
+---
+# apm.service.yml
 ---
 apiVersion: v1
 kind: Service
 metadata:
+  namespace: elastic
   name: apm-server
   labels:
     app: apm-server
 spec:
   ports:
   - port: 8200
-    targetPort: 8200
-    name: http
-    nodePort: 31000
+    name: apm-server
   selector:
     app: apm-server
-  type: NodePort
 ---
-apiVersion: extensions/v1beta1
+# apm.deployment.yml
+---
+apiVersion: apps/v1
 kind: Deployment
 metadata:
+  namespace: elastic
   name: apm-server
+  labels:
+    app: apm-server
 spec:
-  # this replicas value is default
-  # modify it according to your case
   replicas: 1
+  selector:
+    matchLabels:
+      app: apm-server
   template:
     metadata:
       labels:
@@ -65,16 +57,30 @@ spec:
     spec:
       containers:
       - name: apm-server
-        image: docker.elastic.co/apm/apm-server:7.13.2
+        image: docker.elastic.co/apm/apm-server:7.8.0
+        env:
+        - name: ELASTICSEARCH_HOST
+          value: "108.137.55.111"
+        - name: ELASTICSEARCH_PORT
+          value: "9200"
+        - name: ELASTICSEARCH_USERNAME
+          value: elastic
+        - name: ELASTICSEARCH_PASSWORD
+          value: changeme
+        - name: KIBANA_HOST
+          value: "108.137.55.111"
+        - name: KIBANA_PORT
+          value: "5601"
         ports:
         - containerPort: 8200
-          name: apm-port
+          name: apm-server
         volumeMounts:
-        - name: apm-server-config
+        - name: config
           mountPath: /usr/share/apm-server/apm-server.yml
           readOnly: true
           subPath: apm-server.yml
       volumes:
-      - name: apm-server-config
+      - name: config
         configMap:
           name: apm-server-config
+---
