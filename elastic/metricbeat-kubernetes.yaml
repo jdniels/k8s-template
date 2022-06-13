@@ -45,6 +45,12 @@ data:
                   ssl.certificate_authorities:
                     - /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
                   period: 30s
+                - module: kubernetes
+                  metricsets:
+                    - event
+        - type: kubernetes
+          node: ${NODE_NAME}
+          hints.enabled: true
 
     processors:
       - add_cloud_metadata:
@@ -77,9 +83,9 @@ data:
         - network
         - process
         - process_summary
-        #- core
-        #- diskio
-        #- socket
+        - core
+        - diskio
+        - socket
       processes: ['.*']
       process.include_top_n:
         by_cpu: 5      # include top 5 processes by CPU
