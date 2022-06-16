@@ -5,7 +5,7 @@ metadata:
   name: filebeat-config
   namespace: kube-system
   labels:
-    app: filebeat
+    k8s-app: filebeat
 data:
   filebeat.yml: |-
 
@@ -13,29 +13,22 @@ data:
       providers:
         - type: kubernetes
           templates:
-            - condition:
-                equals:
-                  kubernetes.labels.logger: "filebeat"
-              config:
-                - type: docker
-                  containers.ids:
-                    - "${data.kubernetes.container.id}"
-                  json.keys_under_root: true
-                  json.overwrite_keys: true
-                  json.add_error_key: true
-
-                  env: gke
-
-                  setup.kibana:
-                    host: "http://108.137.55.111:5601"
-                    space.id: neverland
-
-                  setup.template.enabled: false
-                  setup.template.overwrite: false
+              - condition:
+                  equals:
+                    kubernetes.labels.logger: "filebeat"
+          node: ${NODE_NAME}
+          hints.enabled: true
+          hints.default_config:
+            type: container
+            paths:
+              - /var/log/containers/*${data.kubernetes.container.id}.log
 
     processors:
-        - add_cloud_metadata:
-        - add_host_metadata:
+      - add_cloud_metadata:
+      - add_host_metadata:
+
+    setup.dashboards.enabled: true
+    setup.kibana.host: "http://108.137.55.111:5601"
 
     output.elasticsearch:
       hosts: ['${ELASTICSEARCH_HOST:http://108.137.55.111}:${ELASTICSEARCH_PORT:9200}']
