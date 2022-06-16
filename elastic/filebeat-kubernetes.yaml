@@ -5,40 +5,37 @@ metadata:
   name: filebeat-config
   namespace: kube-system
   labels:
-    k8s-app: filebeat
+    app: filebeat
 data:
   filebeat.yml: |-
-    filebeat.inputs:
-    - type: container
-      paths:
-        - /var/log/containers/*.log
-      processors:
-        - add_kubernetes_metadata:
-            host: ${NODE_NAME}
-            matchers:
-            - logs_path:
-                logs_path: "/var/log/containers/"
 
-    # To enable hints based autodiscover, remove `filebeat.inputs` configuration and uncomment this:
-    #filebeat.autodiscover:
-    #  providers:
-    #    - type: kubernetes
-    #      node: ${NODE_NAME}
-    #      hints.enabled: true
-    #      hints.default_config:
-    #        type: container
-    #        paths:
-    #          - /var/log/containers/*${data.kubernetes.container.id}.log
+    filebeat.autodiscover:
+      providers:
+        - type: kubernetes
+          templates:
+            - condition:
+                equals:
+                  kubernetes.labels.logger: "filebeat"
+              config:
+                - type: docker
+                  containers.ids:
+                    - "${data.kubernetes.container.id}"
+                  json.keys_under_root: true
+                  json.overwrite_keys: true
+                  json.add_error_key: true
+
+                  env: gke
+
+                  setup.kibana:
+                    host: "http://108.137.55.111:5601"
+                    space.id: neverland
+
+                  setup.template.enabled: false
+                  setup.template.overwrite: false
 
     processors:
-      - add_cloud_metadata:
-      - add_host_metadata:
-
-    cloud.id: ${ELASTIC_CLOUD_ID}
-    cloud.auth: ${ELASTIC_CLOUD_AUTH}
-
-    setup.dashboards.enabled: true
-    setup.kibana.host: "http://108.137.55.111:5601"
+        - add_cloud_metadata:
+        - add_host_metadata:
 
     output.elasticsearch:
       hosts: ['${ELASTICSEARCH_HOST:http://108.137.55.111}:${ELASTICSEARCH_PORT:9200}']
